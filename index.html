@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ocean Creator - Interactive Aquarium</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome for beautiful UI Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght=400;600;700&display=swap');
+
+    body {
+      font-family: 'Quicksand', sans-serif;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* Ocean themes */
+    .theme-tropical {
+      background: linear-gradient(to bottom, #0ea5e9, #0284c7, #0369a1, #075985, #0c4a6e);
+    }
+    .theme-abyssal {
+      background: linear-gradient(to bottom, #0f172a, #0b0f19, #020617, #000000);
+    }
+    .theme-sunset {
+      background: linear-gradient(to bottom, #f43f5e, #be123c, #881337, #4c0519, #0f051d);
+    }
+    .theme-neon {
+      background: linear-gradient(to bottom, #4a044e, #3b0764, #1e1b4b, #030712);
+    }
+
+    /* Light rays animation */
+    .light-ray {
+      clip-path: polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%);
+      background: linear-gradient(to bottom, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0));
+      transform-origin: top center;
+      animation: sway RaysSway 8s ease-in-out infinite alternate;
+    }
+
+    @keyframes RaysSway {
+      0% { transform: rotate(-5deg) scaleX(0.8); }
+      100% { transform: rotate(10deg) scaleX(1.2); }
+    }
+
+    /* Bubbles rise */
+    .bubble {
+      position: absolute;
+      background: rgba(255, 255, 255, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      border-radius: 50%;
+      pointer-events: none;
+      animation: rise 12s linear infinite;
+    }
+    .bubble::after {
+      content: '';
+      position: absolute;
+      top: 15%;
+      left: 15%;
+      width: 30%;
+      height: 30%;
+      background: rgba(255, 255, 255, 0.5);
+      border-radius: 50%;
+    }
+
+    @keyframes rise {
+      0% {
+        transform: translateY(110vh) translateX(0) scale(1);
+        opacity: 0;
+      }
+      10% {
+        opacity: 0.6;
+      }
+      90% {
+        opacity: 0.6;
+      }
+      100% {
+        transform: translateY(-10vh) translateX(100px) scale(0.8);
+        opacity: 0;
+      }
+    }
+
+    /* Coral / Floor items sway animation */
+    .sway-slow {
+      transform-origin: bottom center;
+      animation: seaweedSway 6s ease-in-out infinite alternate;
+    }
+    .sway-fast {
+      transform-origin: bottom center;
+      animation: seaweedSway 4s ease-in-out infinite alternate;
+    }
+    .sway-medium {
+      transform-origin: bottom center;
+      animation: seaweedSway 5s ease-in-out infinite alternate;
+    }
+
+    @keyframes seaweedSway {
+      0% { transform: rotate(-4deg) skewX(-2deg); }
+      100% { transform: rotate(4deg) skewX(2deg); }
+    }
+
+    /* UI glassmorphism */
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.45);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* Fish elements transitions */
+    .creature {
+      position: absolute;
+      will-change: transform, left, top;
+      cursor: pointer;
+      transition: transform 0.2s ease-out;
+    }
+    .creature:hover {
+      filter: drop-shadow(0 0 12px rgba(255,255,255,0.8)) brightness(1.2);
+    }
+
+    /* Custom ripple effect */
+    .ripple {
+      position: absolute;
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      border-radius: 50%;
+      pointer-events: none;
+      animation: rippleEffect 0.8s ease-out forwards;
+    }
+    @keyframes rippleEffect {
+      0% {
+        width: 0px;
+        height: 0px;
+        opacity: 1;
+      }
+      100% {
+        width: 120px;
+        height: 120px;
+        opacity: 0;
+        transform: translate(-50%, -50%);
+      }
+    }
+
+    /* Food particle */
+    .food-pellet {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      background: radial-gradient(circle, #eab308 0%, #ca8a04 100%);
+      border-radius: 50%;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body class="theme-tropical h-screen w-screen transition-all duration-1000 ease-in-out relative flex flex-col justify-between overflow-hidden">
+
+  <!-- Interactive Water Canvas/Layer for Ripple Effects -->
+  <div id="ocean-container" class="absolute inset-0 w-full h-full overflow-hidden z-10 cursor-pointer">
+    <!-- Light Rays in the Background -->
+    <div class="absolute inset-0 pointer-events-none opacity-60 overflow-hidden">
+      <div class="light-ray absolute top-0 left-[15%] w-[12%] h-[120%] opacity-40"></div>
+      <div class="light-ray absolute top-0 left-[35%] w-[18%] h-[120%] opacity-30" style="animation-delay: -2s;"></div>
+      <div class="light-ray absolute top-0 left-[60%] w-[10%] h-[120%] opacity-50" style="animation-delay: -4s;"></div>
+      <div class="light-ray absolute top-0 left-[80%] w-[15%] h-[120%] opacity-25" style="animation-delay: -1s;"></div>
+    </div>
+
+    <!-- Bubble Generator Target Container -->
+    <div id="bubble-container" class="absolute inset-0 pointer-events-none"></div>
+
+    <!-- Live Fish / Marine Creatures Container -->
+    <div id="aquarium-world" class="absolute inset-0 w-full h-full"></div>
+
+    <!-- Food Pellets Container -->
+    <div id="food-container" class="absolute inset-0 w-full h-full pointer-events-none"></div>
+
+    <!-- Interactive Ripple Canvas Layer -->
+    <div id="ripple-layer" class="absolute inset-0 pointer-events-none"></div>
+  </div>
+
+  <!-- Ocean Floor SVG Layer (Parallax Bottom Decoration) -->
+  <div class="absolute bottom-0 left-0 w-full h-[120px] pointer-events-none z-20 flex items-end justify-between overflow-hidden px-4 md:px-12">
+    <!-- Seaweed Left -->
+    <svg class="sway-slow w-24 h-48 -mb-4 opacity-80" viewBox="0 0 100 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M50,200 Q20,150 55,100 T30,20 T40,0" stroke="#065f46" stroke-width="12" stroke-linecap="round"/>
+      <path d="M40,200 Q15,140 45,90 T25,10" stroke="#047857" stroke-width="8" stroke-linecap="round"/>
+      <path d="M60,200 Q80,130 50,80 T70,20" stroke="#10b981" stroke-width="6" stroke-linecap="round"/>
+    </svg>
+
+    <!-- Rocks & Coral Left-Center -->
+    <div class="flex items-end -mb-2 space-x-[-15px]">
+      <svg class="w-16 h-12 fill-slate-700 opacity-90" viewBox="0 0 100 80">
+        <path d="M0,80 Q20,20 50,30 T100,80 Z" />
+      </svg>
+      <svg class="sway-medium w-16 h-28 fill-emerald-500 opacity-90" viewBox="0 0 80 150">
+        <path d="M40,150 C20,120 10,90 30,60 C40,40 20,20 40,0 C60,20 40,40 50,60 C70,90 60,120 40,150 Z" />
+      </svg>
+      <svg class="w-24 h-16 fill-slate-600 opacity-95" viewBox="0 0 150 100">
+        <path d="M0,100 Q40,10 80,40 T150,100 Z" />
+      </svg>
+    </div>
+
+    <!-- Center Seaweed Forest -->
+    <div class="flex items-end space-x-1">
+      <svg class="sway-fast w-12 h-36 opacity-75" viewBox="0 0 50 150">
+        <path d="M25,150 Q10,110 35,70 T15,0" stroke="#0f766e" stroke-width="8" stroke-linecap="round" fill="none"/>
+      </svg>
+      <svg class="sway-slow w-16 h-44 opacity-85" viewBox="0 0 60 180">
+        <path d="M30,180 Q50,130 20,80 T40,0" stroke="#14b8a6" stroke-width="10" stroke-linecap="round" fill="none"/>
+      </svg>
+      <svg class="sway-medium w-10 h-32 opacity-70" viewBox="0 0 40 120">
+        <path d="M20,120 Q5,90 25,60 T10,0" stroke="#0d9488" stroke-width="6" stroke-linecap="round" fill="none"/>
+      </svg>
+    </div>
+
+    <!-- Glowing Sea Anemone & Sea Star Floor Decor -->
+    <div class="flex items-end -mb-1 space-x-[-10px]">
+      <svg class="sway-medium w-16 h-20" viewBox="0 0 100 120">
+        <!-- Base -->
+        <path d="M20,120 Q50,90 80,120 Z" fill="#4338ca"/>
+        <!-- Tentacles -->
+        <path d="M30,100 Q10,50 15,10" stroke="#e0e7ff" stroke-width="5" stroke-linecap="round" fill="none"/>
+        <path d="M40,100 Q30,40 38,15" stroke="#818cf8" stroke-width="6" stroke-linecap="round" fill="none"/>
+        <path d="M50,100 Q50,30 60,10" stroke="#a5b4fc" stroke-width="5" stroke-linecap="round" fill="none"/>
+        <path d="M60,100 Q70,45 80,20" stroke="#6366f1" stroke-width="6" stroke-linecap="round" fill="none"/>
+      </svg>
+      
+      <!-- Interactive Sea Star (animated on hover) -->
+      <svg class="w-10 h-10 fill-amber-500 hover:rotate-12 transition-transform duration-300 cursor-pointer pointer-events-auto filter drop-shadow" viewBox="0 0 100 100" id="floor-star">
+        <polygon points="50,5 64,36 98,36 70,57 81,91 50,70 19,91 30,57 2,36 36,36" />
+      </svg>
+    </div>
+
+    <!-- Seaweed Right -->
+    <svg class="sway-slow w-28 h-56 -mb-6 opacity-85" viewBox="0 0 100 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M50,220 Q80,160 40,110 T70,30 T55,0" stroke="#1e3a8a" stroke-width="12" stroke-linecap="round"/>
+      <path d="M60,220 Q90,170 50,120 T80,40" stroke="#3b82f6" stroke-width="8" stroke-linecap="round"/>
+      <path d="M40,220 Q20,150 60,95 T30,15" stroke="#60a5fa" stroke-width="6" stroke-linecap="round"/>
+    </svg>
+  </div>
+
+  <!-- Interactive Dashboard Overlay (Header) -->
+  <header class="w-full z-30 p-4 md:p-6 pointer-events-none">
+    <div class="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+      
+      <!-- Title & Branding -->
+      <div class="glass-panel p-4 rounded-2xl flex items-center space-x-3 pointer-events-auto shadow-lg">
+        <div class="w-12 h-12 bg-sky-500/30 rounded-xl flex items-center justify-center animate-bounce">
+          <i class="fa-solid fa-fish-fins text-sky-200 text-2xl"></i>
+        </div>
+        <div>
+          <h1 class="text-white text-xl md:text-2xl font-bold tracking-wide">Ocean Creator</h1>
+          <p class="text-sky-200 text-xs font-semibold">Tap anywhere to spawn unique fish!</p>
+        </div>
+      </div>
+
+      <!-- Live Counters & Controls -->
+      <div class="flex items-center space-x-3 pointer-events-auto">
+        <!-- Live Counter Pill -->
+        <div class="glass-panel text-white py-2 px-4 rounded-xl flex items-center space-x-2 shadow-md">
+          <span class="inline-block w-2.5 h-2.5 bg-green-400 rounded-full animate-ping"></span>
+          <span class="text-xs text-sky-200 uppercase font-bold tracking-wider">Creatures:</span>
+          <span id="fish-count" class="font-black text-lg text-sky-100">0</span>
+        </div>
+
+        <!-- Dynamic Sound Trigger Toggle -->
+        <button id="sound-btn" class="glass-panel text-white hover:bg-white/20 transition-all p-3 rounded-xl shadow-md text-sm flex items-center justify-center gap-2" title="Toggle Bubbling & Pop Sound Effects">
+          <i id="sound-icon" class="fa-solid fa-volume-high text-green-400"></i>
+          <span class="hidden md:inline font-semibold">Audio FX</span>
+        </button>
+
+        <!-- Help Info Modal button -->
+        <button id="info-btn" class="glass-panel text-white hover:bg-white/20 transition-all p-3 rounded-xl shadow-md flex items-center justify-center">
+          <i class="fa-solid fa-circle-info text-sky-200"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Central User Instructions Overlay (Disappears after first click) -->
+  <div id="intro-card" class="absolute inset-0 flex items-center justify-center pointer-events-none z-10 transition-all duration-700 ease-out">
+    <div class="glass-panel p-8 rounded-3xl max-w-md mx-4 text-center shadow-2xl border-white/20 transform scale-100 transition-transform">
+      <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-tr from-sky-400 to-indigo-500 flex items-center justify-center text-white text-4xl shadow-inner animate-pulse">
+        <i class="fa-solid fa-wand-magic-sparkles"></i>
+      </div>
+      <h2 class="text-white text-2xl font-bold mb-2">Create Your Ecosystem</h2>
+      <p class="text-sky-200 text-sm mb-6 leading-relaxed">
+        Click or tap anywhere on the ocean surface to hatch random procedurally generated sea creatures! Drop food, change ocean depth themes, and watch them thrive.
+      </p>
+      <span class="inline-block bg-white/10 text-white text-xs font-semibold tracking-wider uppercase py-2 px-4 rounded-full border border-white/20 animate-bounce">
+        Tap To Start
+      </span>
+    </div>
+  </div>
+
+  <!-- Interactive Sidebar & Creator Toolkit (Bottom Control Panel) -->
+  <footer class="w-full z-30 p-4 pointer-events-none">
+    <div class="max-w-5xl mx-auto glass-panel p-4 rounded-2xl flex flex-wrap items-center justify-between gap-4 pointer-events-auto shadow-2xl">
+      
+      <!-- Spawning Options / Presets -->
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-xs text-sky-200 font-bold uppercase tracking-wider block mr-1">Hatch Category:</span>
+        <button id="spawn-all" class="category-btn active bg-sky-500 hover:bg-sky-400 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-md">
+          <i class="fa-solid fa-shuffle mr-1"></i> Random All
+        </button>
+        <button id="spawn-classic" class="category-btn bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all">
+          🐠 Finfish
+        </button>
+        <button id="spawn-jelly" class="category-btn bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all">
+          👾 Jellyfish
+        </button>
+        <button id="spawn-ray" class="category-btn bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all">
+          🪁 Rays
+        </button>
+        <button id="spawn-turtle" class="category-btn bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all">
+          🐢 Sea Turtle
+        </button>
+      </div>
+
+      <!-- Action Buttons & Utilities -->
+      <div class="flex flex-wrap items-center gap-3">
+        <!-- Drop Food Trigger Button -->
+        <button id="food-btn" class="relative group bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold px-4 py-2.5 rounded-xl text-sm transition-all shadow-lg hover:scale-105 active:scale-95 flex items-center gap-2">
+          <i class="fa-solid fa-cookie-bite text-slate-950 animate-spin" style="animation-duration: 6s;"></i>
+          <span>Feed Fish</span>
+          <span class="absolute -top-2 -right-2 bg-red-500 text-white text-[9px] px-1.5 py-0.5 rounded-full uppercase font-black">Food</span>
+        </button>
+
+        <!-- Change Theme Selector -->
+        <div class="relative group">
+          <select id="theme-select" class="bg-slate-800/80 text-white text-xs font-semibold px-3 py-2.5 rounded-xl border border-white/10 outline-none cursor-pointer hover:bg-slate-700 transition-all">
+            <option value="tropical">🌴 Tropical Shallows</option>
+            <option value="abyssal">🌌 Abyssal Depths</option>
+            <option value="sunset">🌅 Sunset Coral Reef</option>
+            <option value="neon">🔮 Bio-luminescent Trench</option>
+          </select>
+        </div>
+
+        <!-- Autopilot Spawner Toggle -->
+        <button id="auto-btn" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-md flex items-center gap-2">
+          <i id="auto-icon" class="fa-solid fa-robot"></i>
+          <span id="auto-label">Auto-Spawning</span>
+        </button>
+
+        <!-- Clear Ocean Utility -->
+        <button id="clear-btn" class="bg-red-500/20 hover:bg-red-500 text-red-200 hover:text-white border border-red-500/30 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all" title="Reset Sandbox">
+          <i class="fa-solid fa-trash-can"></i>
+        </button>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Help & Tutorial Modal Dialog Box -->
+  <div id="info-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4 transition-all duration-300">
+    <div class="glass-panel p-6 md:p-8 rounded-3xl max-w-lg w-full text-white border-white/20 relative shadow-2xl">
+      <button id="modal-close-btn" class="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors text-xl">
+        <i class="fa-solid fa-circle-xmark"></i>
+      </button>
+
+      <div class="flex items-center space-x-3 mb-4">
+        <i class="fa-solid fa-circle-info text-sky-400 text-3xl"></i>
+        <h3 class="text-2xl font-bold">Ocean Creator Guide</h3>
+      </div>
+
+      <div class="space-y-4 text-sm leading-relaxed text-sky-100">
+        <p>Welcome to your personal digital ocean! Create a bustling underwater sanctuary using creative, randomized mathematical parameters.</p>
+        
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2 text-xs">
+          <div class="bg-white/5 p-3 rounded-xl border border-white/10">
+            <h4 class="font-bold text-sky-300 mb-1"><i class="fa-solid fa-mouse"></i> Tap/Click Spawning</h4>
+            Click anywhere on the open water. A unique marine creature of random size, swim pattern, and color gradient will appear dynamically.
+          </div>
+          <div class="bg-white/5 p-3 rounded-xl border border-white/10">
+            <h4 class="font-bold text-sky-300 mb-1"><i class="fa-solid fa-pizza-slice"></i> Feeding Mechanism</h4>
+            Tap the <span class="text-amber-400 font-bold">Feed Fish</span> button to drop delicious yellow nutrient pellets. Nearby fish are attracted to the treats!
+          </div>
+          <div class="bg-white/5 p-3 rounded-xl border border-white/10">
+            <h4 class="font-bold text-sky-300 mb-1"><i class="fa-solid fa-palette"></i> Biome Themes</h4>
+            Swap ocean depth options in the footer. Choose from bright coral depths to mysterious midnight bioluminescent zones.
+          </div>
+          <div class="bg-white/5 p-3 rounded-xl border border-white/10">
+            <h4 class="font-bold text-sky-300 mb-1"><i class="fa-solid fa-volume-high"></i> Audio Synthesis</h4>
+            Synthesizes satisfying bubbles and ocean swooshes. Unmute with the <strong>Audio FX</strong> button at the top!
+          </div>
+        </div>
+
+        <p class="text-xs text-sky-300 italic border-t border-white/10 pt-4">Designed with performance-tuned canvas layers and customizable SVG assets. Enjoy relaxation and ocean design!</p>
+      </div>
+
+      <div class="mt-6 text-right">
+        <button id="modal-ok-btn" class="bg-sky-500 hover:bg-sky-400 text-white font-bold px-6 py-2.5 rounded-xl text-sm transition-all shadow-md">
+          Start Exploring
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Audio Synthesis Script + Main Game Engine logic -->
+  <script>
+    // --- Audio Synthesis Engine ---
+    // Using native Web Audio API to prevent relying on external sound asset hosting.
+    let audioCtx = null;
+    let soundEnabled = true;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+    }
+
+    function playBubbleSound(frequency = 180, duration = 0.3) {
+      if (!soundEnabled) return;
+      initAudio();
+      if (!audioCtx) return;
+
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      osc.type = 'sine';
+      // High sliding bubble pitch
+      osc.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(frequency * 3.5, audioCtx.currentTime + duration);
+
+      gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+      osc.start();
+      osc.stop(audioCtx.currentTime + duration);
+    }
+
+    function playSplashSound() {
+      if (!soundEnabled) return;
+      initAudio();
+      if (!audioCtx) return;
+
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(80, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.5);
+
+      gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.5);
+    }
+
+    // --- State variables ---
+    let creaturesList = [];
+    let foodList = [];
+    let activeCategory = 'all'; // Current selected category in toolkit
+    let autoSpawningInterval = null;
+
+    // Dom queries
+    const oceanContainer = document.getElementById('ocean-container');
+    const aquariumWorld = document.getElementById('aquarium-world');
+    const foodContainer = document.getElementById('food-container');
+    const bubbleContainer = document.getElementById('bubble-container');
+    const rippleLayer = document.getElementById('ripple-layer');
+    const fishCountEl = document.getElementById('fish-count');
+    const introCard = document.getElementById('intro-card');
+
+    const soundBtn = document.getElementById('sound-btn');
+    const soundIcon = document.getElementById('sound-icon');
+    const infoBtn = document.getElementById('info-btn');
+    const infoModal = document.getElementById('info-modal');
+    const modalCloseBtn = document.getElementById('modal-close-btn');
+    const modalOkBtn = document.getElementById('modal-ok-btn');
+    const clearBtn = document.getElementById('clear-btn');
+    const foodBtn = document.getElementById('food-btn');
+    const autoBtn = document.getElementById('auto-btn');
+    const autoIcon = document.getElementById('auto-icon');
+    const autoLabel = document.getElementById('auto-label');
+    const themeSelect = document.getElementById('theme-select');
+    const categoryButtons = document.querySelectorAll('.category-btn');
+
+    // Dynamic Color palettes used to randomize the fish looks
+    const fishGradients = [
+      { start: '#f43f5e', end: '#fb923c' }, // Rose to Orange
+      { start: '#eab308', end: '#f97316' }, // Yellow to Orange
+      { start: '#10b981', end: '#06b6d4' }, // Emerald to Cyan
+      { start: '#06b6d4', end: '#3b82f6' }, // Cyan to Blue
+      { start: '#8b5cf6', end: '#ec4899' }, // Violet to Pink
+      { start: '#f43f5e', end: '#8b5cf6' }, // Rose to Violet
+      { start: '#facc15', end: '#10b981' }, // Lemon to Emerald
+      { start: '#a855f7', end: '#3b82f6' }, // Purple to Sapphire
+      { start: '#fda4af', end: '#f43f5e' }  // Cottoncandy Pink
+    ];
+
+    // --- Interactive Sea Star trigger ---
+    document.getElementById('floor-star').addEventListener('click', (e) => {
+      e.stopPropagation(); // Avoid triggering main ocean click
+      // Spin and trigger bubble pitch slide
+      e.currentTarget.style.transform = 'rotate(360deg) scale(1.3)';
+      setTimeout(() => {
+        if(document.getElementById('floor-star')) {
+          document.getElementById('floor-star').style.transform = '';
+        }
+      }, 600);
+      playBubbleSound(440, 0.5);
+      createFloatingBubblesAt(e.clientX || window.innerWidth / 2, e.clientY || window.innerHeight - 80, 8);
+    });
+
+    // --- Helper Math Utilities ---
+    const randRange = (min, max) => Math.random() * (max - min) + min;
+    const selectRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+    // Generates a complete SVG code string for unique marine life
+    function generateCreatureSVG(type, id, gradientStart, gradientEnd, size) {
+      const uniqueGradId = `grad-${type}-${id}`;
+      const uniqueAccentGradId = `grad-accent-${type}-${id}`;
+      
+      let svgContent = '';
+      
+      if (type === 'classic') {
+        // Class Finfish with randomized tail styles and eyes
+        const tailStyles = [
+          // Elegant beta tail
+          `M75,50 Q105,10 115,35 T95,65 Q115,90 105,100 Z`,
+          // Swallow tail
+          `M75,50 L115,20 L95,50 L115,80 Z`,
+          // Round gold-fish tail
+          `M75,40 C105,20 120,40 105,60 C120,80 105,100 75,70 Z`
+        ];
+        const chosenTail = selectRandom(tailStyles);
+
+        svgContent = `
+          <svg width="${size}" height="${size * 0.75}" viewBox="0 0 120 90" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="${uniqueGradId}" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="${gradientStart}" />
+                <stop offset="100%" stop-color="${gradientEnd}" />
+              </linearGradient>
+              <linearGradient id="${uniqueAccentGradId}" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#ffffff" stop-opacity="0.6" />
+                <stop offset="100%" stop-color="${gradientEnd}" stop-opacity="0" />
+              </linearGradient>
+            </defs>
+            <!-- Tail Fin -->
+            <path d="${chosenTail}" fill="url(#${uniqueGradId})" opacity="0.9" />
+            <!-- Dorsal Fin -->
+            <path d="M40,30 Q60,5 75,25 Z" fill="${gradientStart}" opacity="0.8" />
+            <!-- Main Body -->
+            <path d="M15,50 C30,20 70,25 80,50 C70,75 30,80 15,50 Z" fill="url(#${uniqueGradId})" />
+            <!-- Highlight Accent -->
+            <path d="M15,50 C30,25 70,30 80,50 C70,40 30,35 15,50 Z" fill="url(#${uniqueAccentGradId})" />
+            <!-- Eye -->
+            <circle cx="32" cy="45" r="5" fill="#ffffff" />
+            <circle cx="31" cy="44" r="2.5" fill="#000000" />
+            <circle cx="32" cy="43" r="1" fill="#ffffff" />
+            <!-- Ventral Fin -->
+            <path d="M45,68 Q55,85 62,70 Z" fill="${gradientEnd}" opacity="0.8" />
+          </svg>
+        `;
+      } else if (type === 'jelly') {
+        // Mysterious bioluminescent jellyfish with long moving tentacles
+        svgContent = `
+          <svg width="${size}" height="${size * 1.5}" viewBox="0 0 100 150" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="${uniqueGradId}" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="${gradientStart}" />
+                <stop offset="70%" stop-color="${gradientEnd}" stop-opacity="0.8" />
+                <stop offset="100%" stop-color="${gradientStart}" stop-opacity="0.1" />
+              </linearGradient>
+            </defs>
+            <!-- Moving Tentacles -->
+            <g stroke="url(#${uniqueGradId})" stroke-width="2.5" fill="none" stroke-linecap="round">
+              <path class="sway-medium" d="M30,50 Q20,90 35,140" />
+              <path class="sway-fast" d="M40,50 Q45,100 38,145" style="animation-delay: -1s;" />
+              <path class="sway-slow" d="M50,55 Q55,95 52,148" style="animation-delay: -2s;" />
+              <path class="sway-medium" d="M60,50 Q70,105 58,138" style="animation-delay: -0.5s;" />
+              <path class="sway-fast" d="M70,50 Q80,95 65,142" style="animation-delay: -1.5s;" />
+            </g>
+            <!-- Glowing Inner bells -->
+            <path d="M35,50 Q50,30 65,50" fill="none" stroke="#ffffff" stroke-width="2" opacity="0.6" />
+            <!-- Mushroom Cap Dome -->
+            <path d="M20,50 C20,15 80,15 80,50 C70,55 30,55 20,50 Z" fill="url(#${uniqueGradId})" />
+            <!-- Soft Rim Beads -->
+            <circle cx="25" cy="51" r="2" fill="${gradientStart}" />
+            <circle cx="35" cy="53" r="2" fill="${gradientStart}" />
+            <circle cx="45" cy="54" r="2.5" fill="#ffffff" />
+            <circle cx="55" cy="54" r="2.5" fill="#ffffff" />
+            <circle cx="65" cy="53" r="2" fill="${gradientEnd}" />
+            <circle cx="75" cy="51" r="2" fill="${gradientEnd}" />
+          </svg>
+        `;
+      } else if (type === 'ray') {
+        // Manta Ray flapping wings flatly
+        svgContent = `
+          <svg width="${size * 1.4}" height="${size * 0.9}" viewBox="0 0 160 100" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="${uniqueGradId}" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="${gradientStart}" />
+                <stop offset="50%" stop-color="${gradientEnd}" />
+                <stop offset="100%" stop-color="${gradientStart}" />
+              </linearGradient>
+            </defs>
+            <!-- Long tail -->
+            <path d="M80,50 Q80,95 95,100" stroke="${gradientEnd}" stroke-width="2" fill="none" />
+            <!-- Wings / Main Diamond Body -->
+            <path d="M80,15 C45,20 10,40 5,48 C5,55 30,60 80,55 C130,60 155,55 155,48 C150,40 115,20 80,15 Z" fill="url(#${uniqueGradId})" />
+            <!-- Cephalic horns -->
+            <path d="M72,17 Q70,5 75,5 T78,16" stroke="${gradientStart}" stroke-width="2.5" fill="none" />
+            <path d="M88,17 Q90,5 85,5 T82,16" stroke="${gradientStart}" stroke-width="2.5" fill="none" />
+            <!-- Bioluminescent Spots on Back -->
+            <circle cx="65" cy="35" r="2.5" fill="#ffffff" opacity="0.7" />
+            <circle cx="95" cy="35" r="2.5" fill="#ffffff" opacity="0.7" />
+            <circle cx="60" cy="42" r="1.5" fill="#ffffff" opacity="0.6" />
+            <circle cx="100" cy="42" r="1.5" fill="#ffffff" opacity="0.6" />
+          </svg>
+        `;
+      } else if (type === 'turtle') {
+        // Elegant Sea Turtle with layered flippers and beautiful shell plates
+        svgContent = `
+          <svg width="${size * 1.2}" height="${size * 0.9}" viewBox="0 0 130 90" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="${uniqueGradId}" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="${gradientStart}" />
+                <stop offset="100%" stop-color="${gradientEnd}" />
+              </linearGradient>
+              <linearGradient id="${uniqueAccentGradId}" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#ffffff" stop-opacity="0.4" />
+                <stop offset="100%" stop-color="${gradientEnd}" stop-opacity="0" />
+              </linearGradient>
+            </defs>
+            <!-- Back Flipper (deep layer) -->
+            <path class="sway-slow" d="M 90,52 Q 102,74 112,68 Q 102,52 90,52 Z" fill="${gradientEnd}" opacity="0.75" />
+            
+            <!-- Tail -->
+            <path d="M 100,45 L 110,49 L 100,53 Z" fill="${gradientEnd}" opacity="0.9" />
+            
+            <!-- Front Flipper (deep layer) -->
+            <path class="sway-medium" d="M 50,50 Q 38,84 54,84 Q 60,74 53,50 Z" fill="${gradientEnd}" opacity="0.7" />
+            
+            <!-- Turtle Body, Neck & Head -->
+            <path d="M 45,42 C 32,42 22,37 18,29 C 14,21 24,17 30,23 C 36,29 40,35 45,39 Z" fill="url(#${uniqueGradId})" />
+            
+            <!-- Eye -->
+            <circle cx="22" cy="24" r="2.5" fill="#ffffff" />
+            <circle cx="22" cy="24" r="1.2" fill="#000000" />
+            
+            <!-- Shell (Carapace) -->
+            <path d="M 38,42 C 38,17 98,17 98,42 C 98,52 38,52 38,42 Z" fill="url(#${uniqueGradId})" stroke="${gradientStart}" stroke-width="1.5" />
+            
+            <!-- Shell Rim / Under-shell lip -->
+            <path d="M 35,42 C 35,45 101,45 101,42 Z" fill="${gradientEnd}" opacity="0.95" />
+            
+            <!-- Beautiful Shell Plates (Scutes) Inside Carapace -->
+            <path d="M 48,32 Q 68,22 88,32 M 43,40 Q 68,30 93,40 M 58,22 L 58,32 M 78,22 L 78,32 M 68,32 L 68,40" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round" opacity="0.35" fill="none" />
+            
+            <!-- Front Flipper (foreground layer) -->
+            <path class="sway-fast" d="M 53,46 Q 41,80 57,80 Q 63,70 56,46 Z" fill="url(#${uniqueGradId})" />
+          </svg>
+        `;
+      }
+
+      return svgContent;
+    }
+
+    // --- Create custom floating bubbles on demand ---
+    function createFloatingBubblesAt(x, y, count = 4) {
+      for (let i = 0; i < count; i++) {
+        const bubble = document.createElement('div');
+        bubble.classList.add('bubble');
+        
+        const size = randRange(8, 24);
+        bubble.style.width = `${size}px`;
+        bubble.style.height = `${size}px`;
+        bubble.style.left = `${x + randRange(-30, 30)}px`;
+        bubble.style.bottom = `${window.innerHeight - y + randRange(-20, 20)}px`;
+        
+        // Random drift speed
+        const speed = randRange(6, 12);
+        bubble.style.animationDuration = `${speed}s`;
+        
+        bubbleContainer.appendChild(bubble);
+        
+        // Cleanup after rise animation is finished
+        setTimeout(() => {
+          bubble.remove();
+        }, speed * 1000);
+      }
+    }
+
+    // --- Dynamic Click Ripple effect ---
+    function triggerWaveRipple(x, y) {
+      const ripple = document.createElement('div');
+      ripple.classList.add('ripple');
+      ripple.style.left = `${x}px`;
+      ripple.style.top = `${y}px`;
+      rippleLayer.appendChild(ripple);
+      
+      setTimeout(() => {
+        ripple.remove();
+      }, 800);
+    }
+
+    // --- Main Creature Spawning Engine ---
+    function spawnCreature(x, y, userInitiated = true) {
+      // Pick random category if 'all' is selected
+      let type = activeCategory;
+      if (type === 'all') {
+        type = selectRandom(['classic', 'jelly', 'ray', 'turtle']);
+      }
+
+      const id = Date.now() + Math.random().toString(36).substr(2, 5);
+      const gradient = selectRandom(fishGradients);
+      const size = randRange(55, 110);
+      
+      // Physics parameters: extremely slow and gentle for relaxing atmosphere
+      const speedX = randRange(0.4, 1.1) * (Math.random() > 0.5 ? 1 : -1);
+      const speedY = randRange(0.08, 0.25) * (Math.random() > 0.5 ? 1 : -1);
+      
+      const element = document.createElement('div');
+      element.id = `creature-${id}`;
+      element.className = 'creature';
+      element.innerHTML = generateCreatureSVG(type, id, gradient.start, gradient.end, size);
+      
+      // Initial positioning
+      element.style.left = `${x - size/2}px`;
+      element.style.top = `${y - size/2}px`;
+
+      aquariumWorld.appendChild(element);
+
+      // Sound feedback
+      if (userInitiated) {
+        playSplashSound();
+        createFloatingBubblesAt(x, y, 6);
+        triggerWaveRipple(x, y);
+      }
+
+      // Creature object definition
+      const creatureObj = {
+        id: id,
+        type: type,
+        x: x - size/2,
+        y: y - size/2,
+        vx: speedX,
+        vy: speedY,
+        width: size,
+        height: type === 'jelly' ? size * 1.5 : (type === 'turtle' ? size * 0.9 : size * 0.9),
+        element: element,
+        wiggleOffset: Math.random() * 100,
+        wiggleSpeed: randRange(0.02, 0.05), // relaxed body wiggle rates
+        baseScale: 1,
+        facingRight: speedX > 0,
+        targetFood: null
+      };
+
+      // Handle interactive poke on existing fish
+      element.addEventListener('click', (e) => {
+        e.stopPropagation(); // Stop background propagation
+        
+        // Rapid bubble bursts!
+        playBubbleSound(300, 0.4);
+        createFloatingBubblesAt(creatureObj.x + creatureObj.width/2, creatureObj.y + creatureObj.height/2, 5);
+        
+        // Scatter away in panic (gentle scatter)
+        creatureObj.vx = randRange(1.8, 3.0) * (Math.random() > 0.5 ? 1 : -1);
+        creatureObj.vy = randRange(-1.2, -0.5);
+        
+        // Scale pulse animation feedback
+        element.style.transform = `scale(1.4) rotate(${randRange(-15, 15)}deg)`;
+        setTimeout(() => {
+          element.style.transform = '';
+        }, 300);
+      });
+
+      creaturesList.push(creatureObj);
+      updateCounters();
+
+      // Fade out starter card on first spawn
+      if (introCard && !introCard.classList.contains('opacity-0')) {
+        introCard.classList.add('opacity-0');
+        setTimeout(() => introCard.remove(), 700);
+      }
+    }
+
+    // --- Feed fish mechanics ---
+    function dropFoodPellet(x, y) {
+      const id = 'food-' + Math.random().toString(36).substr(2, 5);
+      const pellet = document.createElement('div');
+      pellet.className = 'food-pellet';
+      pellet.style.left = `${x - 7}px`;
+      pellet.style.top = `${y - 7}px`;
+      foodContainer.appendChild(pellet);
+
+      const foodObj = {
+        id: id,
+        x: x - 7,
+        y: y - 7,
+        vy: randRange(0.8, 1.6),
+        element: pellet
+      };
+
+      foodList.push(foodObj);
+      playBubbleSound(480, 0.15);
+    }
+
+    // --- Main Framerate Loop (60 FPS Motion) ---
+    function updatePhysics() {
+      const widthBounds = window.innerWidth;
+      const heightBounds = window.innerHeight;
+
+      // 1. Process falling food items
+      for (let i = foodList.length - 1; i >= 0; i--) {
+        const food = foodList[i];
+        food.y += food.vy;
+        food.element.style.top = `${food.y}px`;
+
+        // If food reaches bottom, remove it with slight bubble burst
+        if (food.y > heightBounds - 110) {
+          food.element.remove();
+          foodList.splice(i, 1);
+        }
+      }
+
+      // 2. Process creatures AI & physics
+      creaturesList.forEach(c => {
+        // Natural sinus vertical & horizontal wobble
+        c.wiggleOffset += c.wiggleSpeed;
+        
+        // Food Search Strategy
+        if (foodList.length > 0) {
+          // Find the absolute closest food item
+          let closestFood = null;
+          let minDistance = 999999;
+          
+          foodList.forEach(food => {
+            const dx = (food.x) - (c.x + c.width / 2);
+            const dy = (food.y) - (c.y + c.height / 2);
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            
+            if (dist < minDistance && dist < 500) { // Sight radius limit
+              minDistance = dist;
+              closestFood = food;
+            }
+          });
+
+          if (closestFood) {
+            c.targetFood = closestFood;
+            // Swim toward target food (slowed down to 1.2)
+            const angle = Math.atan2(closestFood.y - (c.y + c.height / 2), closestFood.x - (c.x + c.width / 2));
+            const speed = 1.2; 
+            c.vx = Math.cos(angle) * speed;
+            c.vy = Math.sin(angle) * speed;
+            
+            // Check Collision with food to eat it
+            if (minDistance < (c.width / 2 + 10)) {
+              // Eat food pellet!
+              playBubbleSound(600, 0.2);
+              createFloatingBubblesAt(closestFood.x, closestFood.y, 4);
+              
+              // Remove food element
+              const foodIdx = foodList.indexOf(closestFood);
+              if (foodIdx > -1) {
+                closestFood.element.remove();
+                foodList.splice(foodIdx, 1);
+              }
+              
+              c.targetFood = null;
+
+              // Expand creature size slightly
+              c.baseScale = Math.min(c.baseScale + 0.12, 1.8);
+              c.element.style.transition = 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+              setTimeout(() => {
+                if (c.element) c.element.style.transition = 'transform 0.2s ease-out';
+              }, 400);
+            }
+          }
+        } else {
+          // Return to passive natural wander if food list is empty
+          c.targetFood = null;
+          // Apply slow horizontal speed correction towards normal bounds (lowered to 1.1)
+          if (Math.abs(c.vx) > 1.1) c.vx *= 0.95;
+        }
+
+        // Apply velocities
+        c.x += c.vx;
+        c.y += c.vy;
+
+        // Apply beautiful ambient sinus swaying (made subtler/slower)
+        let verticalWobble = Math.sin(c.wiggleOffset) * 0.15;
+        c.y += verticalWobble;
+
+        // Wall collisions / Screen bounding bounces
+        if (c.x + c.width < 0 && c.vx < 0) {
+          // Re-spawn on the other side
+          c.x = widthBounds + 50;
+        } else if (c.x > widthBounds + 50 && c.vx > 0) {
+          c.x = -c.width;
+        }
+
+        // Vertical boundary guardrails
+        if (c.y < 60) {
+          c.y = 60;
+          c.vy = Math.abs(c.vy) * 0.8;
+        } else if (c.y + c.height > heightBounds - 100) {
+          c.y = heightBounds - 100 - c.height;
+          c.vy = -Math.abs(c.vy) * 0.8;
+        }
+
+        // Direction orientation updates
+        if (c.vx > 0.05) {
+          c.facingRight = true;
+        } else if (c.vx < -0.05) {
+          c.facingRight = false;
+        }
+
+        // Apply updated transformations 
+        // 3D rotation simulations using scaleX to flip dynamically on the horizontal axis
+        const finalScaleX = c.facingRight ? -c.baseScale : c.baseScale;
+        const rollDegree = c.vy * 5; // dynamic lean based on dive angle
+        
+        c.element.style.left = `${c.x}px`;
+        c.element.style.top = `${c.y}px`;
+        c.element.style.transform = `scaleX(${finalScaleX}) scaleY(${c.baseScale}) rotate(${rollDegree}deg)`;
+      });
+
+      requestAnimationFrame(updatePhysics);
+    }
+
+    // --- Counter helper ---
+    function updateCounters() {
+      fishCountEl.innerText = creaturesList.length;
+    }
+
+    // --- Interactive click handlers on sandbox ---
+    oceanContainer.addEventListener('mousedown', (e) => {
+      // Avoid accidental triggers when clicking on interactive ui panels or modals
+      if (e.target.closest('header') || e.target.closest('footer') || e.target.closest('#info-modal')) {
+        return;
+      }
+      
+      const rect = oceanContainer.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+
+      spawnCreature(clickX, clickY, true);
+    });
+
+    // Handle touch support safely
+    oceanContainer.addEventListener('touchstart', (e) => {
+      if (e.target.closest('header') || e.target.closest('footer') || e.target.closest('#info-modal')) {
+        return;
+      }
+      if (e.touches && e.touches[0]) {
+        const touch = e.touches[0];
+        const rect = oceanContainer.getBoundingClientRect();
+        const touchX = touch.clientX - rect.left;
+        const touchY = touch.clientY - rect.top;
+
+        spawnCreature(touchX, touchY, true);
+      }
+    });
+
+    // --- Feed fish action ---
+    foodBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      // Drop multiple food items from top center
+      const spawnX = randRange(window.innerWidth * 0.2, window.innerWidth * 0.8);
+      dropFoodPellet(spawnX, 10);
+      
+      // Additional randomized drops
+      setTimeout(() => {
+        dropFoodPellet(spawnX + randRange(-120, 120), 10);
+      }, 150);
+      setTimeout(() => {
+        dropFoodPellet(spawnX + randRange(-200, 200), 10);
+      }, 300);
+    });
+
+    // --- UI Controls: Spawning categories ---
+    categoryButtons.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        categoryButtons.forEach(b => {
+          b.classList.remove('bg-sky-500', 'active');
+          b.classList.add('bg-white/10');
+        });
+        
+        btn.classList.remove('bg-white/10');
+        btn.classList.add('bg-sky-500', 'active');
+        
+        // Map elements
+        if (btn.id === 'spawn-all') activeCategory = 'all';
+        else if (btn.id === 'spawn-classic') activeCategory = 'classic';
+        else if (btn.id === 'spawn-jelly') activeCategory = 'jelly';
+        else if (btn.id === 'spawn-ray') activeCategory = 'ray';
+        else if (btn.id === 'spawn-turtle') activeCategory = 'turtle';
+      });
+    });
+
+    // --- UI Controls: Theme Switcher ---
+    themeSelect.addEventListener('change', (e) => {
+      const theme = e.target.value;
+      document.body.className = "h-screen w-screen transition-all duration-1000 ease-in-out relative flex flex-col justify-between overflow-hidden";
+      
+      if (theme === 'tropical') {
+        document.body.classList.add('theme-tropical');
+      } else if (theme === 'abyssal') {
+        document.body.classList.add('theme-abyssal');
+      } else if (theme === 'sunset') {
+        document.body.classList.add('theme-sunset');
+      } else if (theme === 'neon') {
+        document.body.classList.add('theme-neon');
+      }
+      
+      // Big bubble splash
+      createFloatingBubblesAt(window.innerWidth / 2, window.innerHeight - 100, 12);
+      playSplashSound();
+    });
+
+    // --- UI Controls: Autopilot Spawner Toggle ---
+    autoBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (autoSpawningInterval) {
+        clearInterval(autoSpawningInterval);
+        autoSpawningInterval = null;
+        autoIcon.className = "fa-solid fa-robot";
+        autoBtn.className = "bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-md flex items-center gap-2";
+        autoLabel.innerText = "Auto-Spawning";
+      } else {
+        autoIcon.className = "fa-solid fa-spinner animate-spin text-green-300";
+        autoBtn.className = "bg-green-600 hover:bg-green-500 text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-md flex items-center gap-2";
+        autoLabel.innerText = "Auto Active";
+        
+        // Spawn immediately then start timer interval
+        spawnCreature(randRange(100, window.innerWidth - 100), randRange(150, window.innerHeight - 200), false);
+        
+        autoSpawningInterval = setInterval(() => {
+          if (creaturesList.length < 35) { // Cap spawning limit automatically
+            spawnCreature(randRange(100, window.innerWidth - 100), randRange(150, window.innerHeight - 200), false);
+          }
+        }, 2200);
+      }
+    });
+
+    // --- UI Controls: Audio FX toggle ---
+    soundBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      soundEnabled = !soundEnabled;
+      if (soundEnabled) {
+        soundIcon.className = "fa-solid fa-volume-high text-green-400";
+        initAudio();
+        playBubbleSound(400, 0.2);
+      } else {
+        soundIcon.className = "fa-solid fa-volume-xmark text-red-400";
+      }
+    });
+
+    // --- UI Controls: Reset Aquarium Sandbox ---
+    clearBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      
+      // Play vanishing bubbly sounds
+      playBubbleSound(100, 0.4);
+      
+      // Fade-out animation for all creatures
+      creaturesList.forEach(c => {
+        c.element.style.transition = 'opacity 0.4s ease-out, transform 0.4s ease-out';
+        c.element.style.opacity = '0';
+        c.element.style.transform = 'scale(0.1)';
+      });
+
+      setTimeout(() => {
+        aquariumWorld.innerHTML = '';
+        creaturesList = [];
+        updateCounters();
+      }, 400);
+
+      foodList.forEach(food => food.element.remove());
+      foodList = [];
+    });
+
+    // --- Help Modal Events ---
+    infoBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      infoModal.classList.remove('hidden');
+      infoModal.classList.add('flex');
+    });
+
+    const closeModal = () => {
+      infoModal.classList.add('hidden');
+      infoModal.classList.remove('flex');
+    };
+
+    modalCloseBtn.addEventListener('click', closeModal);
+    modalOkBtn.addEventListener('click', closeModal);
+    infoModal.addEventListener('click', (e) => {
+      if (e.target === infoModal) closeModal();
+    });
+
+    // --- Ambient Bubble Generator ---
+    // Background bubbles rising randomly for visual immersion
+    setInterval(() => {
+      if (document.hidden) return; // Save resources when tab is inactive
+      const spawnX = randRange(0, window.innerWidth);
+      createFloatingBubblesAt(spawnX, window.innerHeight + 50, 1);
+    }, 1200);
+
+    // Initial setup & start rendering loop
+    window.onload = function() {
+      // Start frame updates
+      requestAnimationFrame(updatePhysics);
+      
+      // Spawn standard start ecosystem
+      setTimeout(() => {
+        const cx = window.innerWidth / 2;
+        const cy = window.innerHeight / 2;
+        spawnCreature(cx - 150, cy - 80, false);
+        spawnCreature(cx + 150, cy + 50, false);
+      }, 600);
+    };
+  </script>
+</body>
+</html>
