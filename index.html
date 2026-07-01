@@ -276,9 +276,9 @@
     </div>
   </header>
 
-  <!-- Central User Instructions Overlay (Disappears after first click) -->
-  <div id="intro-card" class="absolute inset-0 flex items-center justify-center pointer-events-none z-10 transition-all duration-700 ease-out">
-    <div class="glass-panel p-8 rounded-3xl max-w-md mx-4 text-center shadow-2xl border-white/20 transform scale-100 transition-transform">
+  <!-- Central User Instructions Overlay (Disappears once start is clicked) -->
+  <div id="intro-card" class="absolute inset-0 flex items-center justify-center pointer-events-none z-40 transition-all duration-700 ease-out">
+    <div class="glass-panel p-8 rounded-3xl max-w-md mx-4 text-center shadow-2xl border-white/20 transform scale-100 transition-transform pointer-events-auto">
       <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-tr from-sky-400 to-indigo-500 flex items-center justify-center text-white text-4xl shadow-inner animate-pulse">
         <i class="fa-solid fa-wand-magic-sparkles"></i>
       </div>
@@ -286,9 +286,9 @@
       <p class="text-sky-200 text-sm mb-6 leading-relaxed">
         Click or tap anywhere on the ocean surface to hatch random procedurally generated sea creatures! Drop food, change ocean depth themes, and watch them thrive.
       </p>
-      <span class="inline-block bg-white/10 text-white text-xs font-semibold tracking-wider uppercase py-2 px-4 rounded-full border border-white/20 animate-bounce">
-        Tap To Start
-      </span>
+      <button id="start-btn" class="inline-block bg-sky-500 hover:bg-sky-400 text-white text-xs font-bold tracking-wider uppercase py-3 px-6 rounded-full border border-white/20 shadow-md transition-all active:scale-95 animate-bounce cursor-pointer">
+        Start Exploring
+      </button>
     </div>
   </div>
 
@@ -466,6 +466,7 @@
     const rippleLayer = document.getElementById('ripple-layer');
     const fishCountEl = document.getElementById('fish-count');
     const introCard = document.getElementById('intro-card');
+    const startBtn = document.getElementById('start-btn');
 
     const soundBtn = document.getElementById('sound-btn');
     const soundIcon = document.getElementById('sound-icon');
@@ -775,12 +776,6 @@
 
       creaturesList.push(creatureObj);
       updateCounters();
-
-      // Fade out starter card on first spawn
-      if (introCard && !introCard.classList.contains('opacity-0')) {
-        introCard.classList.add('opacity-0');
-        setTimeout(() => introCard.remove(), 700);
-      }
     }
 
     // --- Feed fish mechanics ---
@@ -1098,6 +1093,19 @@
       if (e.target === infoModal) closeModal();
     });
 
+    // --- Dismiss Intro Card Event ---
+    if (startBtn) {
+      startBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        playSplashSound();
+        createFloatingBubblesAt(window.innerWidth / 2, window.innerHeight / 2, 12);
+        if (introCard) {
+          introCard.classList.add('opacity-0');
+          setTimeout(() => introCard.remove(), 700);
+        }
+      });
+    }
+
     // --- Ambient Bubble Generator ---
     // Background bubbles rising randomly for visual immersion
     setInterval(() => {
@@ -1110,14 +1118,6 @@
     window.onload = function() {
       // Start frame updates
       requestAnimationFrame(updatePhysics);
-      
-      // Spawn standard start ecosystem
-      setTimeout(() => {
-        const cx = window.innerWidth / 2;
-        const cy = window.innerHeight / 2;
-        spawnCreature(cx - 150, cy - 80, false);
-        spawnCreature(cx + 150, cy + 50, false);
-      }, 600);
     };
   </script>
 </body>
